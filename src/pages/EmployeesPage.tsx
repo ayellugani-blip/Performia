@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Search,
@@ -12,7 +12,11 @@ import {
   SlidersHorizontal,
   X,
   ArrowUpDown,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
+import { MOCK_EMPLOYEES } from '../data/mockEmployees';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -33,153 +37,8 @@ interface Employee {
   joinedYear: number;
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
+// ─── Filter Constants ─────────────────────────────────────────────────────────
 
-const EMPLOYEES: Employee[] = [
-  {
-    id: 'EMP-1001',
-    name: 'Anudeep',
-    initials: 'AN',
-    avatarColor: '#dc2626',
-    role: 'Senior Software Engineer',
-    department: 'Engineering',
-    performance: 69,
-    goalCompletion: 64,
-    trend: 'declining',
-    aiSignal: 'Deadline consistency',
-    aiSignalSeverity: 'high',
-    joinedYear: 2021,
-  },
-  {
-    id: 'EMP-1002',
-    name: 'Tony Stark',
-    initials: 'TS',
-    avatarColor: '#0078D4',
-    role: 'Chief Technology Officer',
-    department: 'Leadership',
-    performance: 94,
-    goalCompletion: 96,
-    trend: 'improving',
-    aiSignal: 'Top performer',
-    aiSignalSeverity: 'low',
-    joinedYear: 2018,
-  },
-  {
-    id: 'EMP-1003',
-    name: 'Hermione Granger',
-    initials: 'HG',
-    avatarColor: '#7c3aed',
-    role: 'ML Engineer',
-    department: 'AI/ML',
-    performance: 80,
-    goalCompletion: 75,
-    trend: 'slight-decline',
-    aiSignal: 'Due-date consistency',
-    aiSignalSeverity: 'medium',
-    joinedYear: 2022,
-  },
-  {
-    id: 'EMP-1004',
-    name: 'Peter Parker',
-    initials: 'PP',
-    avatarColor: '#db2777',
-    role: 'Frontend Engineer',
-    department: 'Engineering',
-    performance: 85,
-    goalCompletion: 87,
-    trend: 'stable',
-    aiSignal: 'Consistent delivery',
-    aiSignalSeverity: 'low',
-    joinedYear: 2023,
-  },
-  {
-    id: 'EMP-1005',
-    name: 'Bruce Wayne',
-    initials: 'BW',
-    avatarColor: '#1e293b',
-    role: 'Security Architect',
-    department: 'Security',
-    performance: 91,
-    goalCompletion: 93,
-    trend: 'improving',
-    aiSignal: 'High impact contributor',
-    aiSignalSeverity: 'low',
-    joinedYear: 2019,
-  },
-  {
-    id: 'EMP-1006',
-    name: 'Wanda Maximoff',
-    initials: 'WM',
-    avatarColor: '#be123c',
-    role: 'Senior Product Designer',
-    department: 'Design',
-    performance: 76,
-    goalCompletion: 71,
-    trend: 'declining',
-    aiSignal: 'Reduced output velocity',
-    aiSignalSeverity: 'high',
-    joinedYear: 2021,
-  },
-  {
-    id: 'EMP-1007',
-    name: 'Sherlock Holmes',
-    initials: 'SH',
-    avatarColor: '#0369a1',
-    role: 'Senior Data Analyst',
-    department: 'Analytics',
-    performance: 88,
-    goalCompletion: 90,
-    trend: 'stable',
-    aiSignal: 'Strong analytical output',
-    aiSignalSeverity: 'low',
-    joinedYear: 2020,
-  },
-  {
-    id: 'EMP-1008',
-    name: 'Eleven',
-    initials: 'EL',
-    avatarColor: '#ea580c',
-    role: 'Software Engineer',
-    department: 'Engineering',
-    performance: 72,
-    goalCompletion: 68,
-    trend: 'declining',
-    aiSignal: 'Delivery trend',
-    aiSignalSeverity: 'high',
-    joinedYear: 2023,
-  },
-  {
-    id: 'EMP-1009',
-    name: 'Neo',
-    initials: 'NE',
-    avatarColor: '#16a34a',
-    role: 'Systems Architect',
-    department: 'Engineering',
-    performance: 83,
-    goalCompletion: 86,
-    trend: 'stable',
-    aiSignal: 'Reliable systems delivery',
-    aiSignalSeverity: 'low',
-    joinedYear: 2020,
-  },
-  {
-    id: 'EMP-1010',
-    name: 'Walter White',
-    initials: 'WW',
-    avatarColor: '#d97706',
-    role: 'Data Scientist',
-    department: 'Analytics',
-    performance: 76,
-    goalCompletion: 71,
-    trend: 'declining',
-    aiSignal: 'Production delivery',
-    aiSignalSeverity: 'high',
-    joinedYear: 2021,
-  },
-];
-
-const DEPARTMENTS = ['All Departments', ...Array.from(new Set(EMPLOYEES.map((e) => e.department))).sort()];
-const ROLES = ['All Roles', 'Senior Software Engineer', 'Chief Technology Officer', 'ML Engineer', 'Frontend Engineer', 'Security Architect', 'Senior Product Designer', 'Senior Data Analyst', 'Software Engineer', 'Systems Architect', 'Data Scientist'];
 const PERFORMANCE_FILTERS = ['All Performance', 'High (≥85%)', 'Medium (70–84%)', 'Needs Attention (<70%)'];
 const TREND_FILTERS = ['All Trends', 'Improving', 'Stable', 'Slight Decline', 'Declining'];
 
@@ -300,25 +159,108 @@ const SelectFilter: React.FC<SelectFilterProps> = ({ label, value, options, onCh
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export const EmployeesPage: React.FC = () => {
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [search, setSearch] = useState('');
-  const [departmentFilter, setDepartmentFilter] = useState(DEPARTMENTS[0]);
-  const [roleFilter, setRoleFilter] = useState(ROLES[0]);
+  const [departmentFilter, setDepartmentFilter] = useState('All Departments');
+  const [roleFilter, setRoleFilter] = useState('All Roles');
   const [performanceFilter, setPerformanceFilter] = useState(PERFORMANCE_FILTERS[0]);
   const [trendFilter, setTrendFilter] = useState(TREND_FILTERS[0]);
   const [sortField, setSortField] = useState<keyof Employee | null>(null);
   const [sortAsc, setSortAsc] = useState(true);
 
+  const fetchEmployees = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/employees');
+      if (!res.ok) {
+        throw new Error(`Server returned status ${res.status}: ${res.statusText}`);
+      }
+      const data = await res.json();
+
+      const mapped: Employee[] = data.map((item: any, idx: number) => {
+        const match = MOCK_EMPLOYEES.find(
+          (m) => m.id === item.id || m.name.toLowerCase() === (item.name || '').toLowerCase()
+        );
+        const colors = [
+          '#dc2626',
+          '#0078D4',
+          '#7c3aed',
+          '#db2777',
+          '#1e293b',
+          '#be123c',
+          '#0369a1',
+          '#ea580c',
+          '#16a34a',
+          '#d97706',
+        ];
+
+        const initials = item.name
+          ? item.name
+              .split(' ')
+              .map((n: string) => n[0])
+              .join('')
+              .toUpperCase()
+              .slice(0, 2)
+          : 'EM';
+
+        return {
+          id: item.id || match?.id || `EMP-${1000 + idx}`,
+          name: item.name || match?.name || 'Unnamed Employee',
+          initials: match?.initials || initials,
+          avatarColor: match?.avatarColor || colors[idx % colors.length],
+          role: item.role || match?.role || 'Employee',
+          department: item.department || match?.department || 'General',
+          performance: match?.performance ?? (typeof item.performance === 'number' ? item.performance : 80),
+          goalCompletion: match?.goalCompletion ?? (typeof item.goalCompletion === 'number' ? item.goalCompletion : 75),
+          trend: match?.trend ?? item.trend ?? 'stable',
+          aiSignal: match?.aiSignal ?? item.aiSignal ?? 'On track',
+          aiSignalSeverity: match?.aiSignalSeverity ?? item.aiSignalSeverity ?? 'low',
+          joinedYear: item.created_at ? new Date(item.created_at).getFullYear() : (match?.joinedYear ?? 2022),
+        };
+      });
+
+      setEmployees(mapped);
+      try {
+        if (typeof window !== 'undefined' && window.sessionStorage) {
+          sessionStorage.setItem('performia_employees', JSON.stringify(mapped));
+        }
+      } catch (_) {}
+    } catch (err: any) {
+      setError(err.message || 'Failed to connect to employee backend API.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
+
+  const DEPARTMENTS = useMemo(() => {
+    const list = Array.from(new Set(employees.map((e) => e.department))).sort();
+    return ['All Departments', ...list];
+  }, [employees]);
+
+  const ROLES = useMemo(() => {
+    const list = Array.from(new Set(employees.map((e) => e.role))).sort();
+    return ['All Roles', ...list];
+  }, [employees]);
+
   const hasFilters =
     search.trim() !== '' ||
-    departmentFilter !== DEPARTMENTS[0] ||
-    roleFilter !== ROLES[0] ||
+    departmentFilter !== 'All Departments' ||
+    roleFilter !== 'All Roles' ||
     performanceFilter !== PERFORMANCE_FILTERS[0] ||
     trendFilter !== TREND_FILTERS[0];
 
   const clearFilters = () => {
     setSearch('');
-    setDepartmentFilter(DEPARTMENTS[0]);
-    setRoleFilter(ROLES[0]);
+    setDepartmentFilter('All Departments');
+    setRoleFilter('All Roles');
     setPerformanceFilter(PERFORMANCE_FILTERS[0]);
     setTrendFilter(TREND_FILTERS[0]);
   };
@@ -333,7 +275,7 @@ export const EmployeesPage: React.FC = () => {
   };
 
   const filtered = useMemo(() => {
-    let result = [...EMPLOYEES];
+    let result = [...employees];
 
     // Search
     if (search.trim()) {
@@ -348,12 +290,12 @@ export const EmployeesPage: React.FC = () => {
     }
 
     // Department
-    if (departmentFilter !== DEPARTMENTS[0]) {
+    if (departmentFilter !== 'All Departments') {
       result = result.filter((e) => e.department === departmentFilter);
     }
 
     // Role
-    if (roleFilter !== ROLES[0]) {
+    if (roleFilter !== 'All Roles') {
       result = result.filter((e) => e.role === roleFilter);
     }
 
@@ -387,13 +329,13 @@ export const EmployeesPage: React.FC = () => {
     }
 
     return result;
-  }, [search, departmentFilter, roleFilter, performanceFilter, trendFilter, sortField, sortAsc]);
+  }, [employees, search, departmentFilter, roleFilter, performanceFilter, trendFilter, sortField, sortAsc]);
 
   // Summary stats
-  const total = EMPLOYEES.length;
-  const atRisk = EMPLOYEES.filter((e) => e.trend === 'declining').length;
-  const avgPerf = Math.round(EMPLOYEES.reduce((s, e) => s + e.performance, 0) / total);
-  const improving = EMPLOYEES.filter((e) => e.trend === 'improving').length;
+  const total = employees.length;
+  const atRisk = employees.filter((e) => e.trend === 'declining').length;
+  const avgPerf = total > 0 ? Math.round(employees.reduce((s, e) => s + e.performance, 0) / total) : 0;
+  const improving = employees.filter((e) => e.trend === 'improving').length;
 
   interface SortableHeaderProps {
     field: keyof Employee;
@@ -417,7 +359,6 @@ export const EmployeesPage: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fadeIn">
-
       {/* ── Page Header ───────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
         <div>
@@ -544,9 +485,14 @@ export const EmployeesPage: React.FC = () => {
                 Search: "{search}"
               </span>
             )}
-            {departmentFilter !== DEPARTMENTS[0] && (
+            {departmentFilter !== 'All Departments' && (
               <span className="rounded-full bg-blue-50 border border-blue-100 px-2 py-0.5 text-[10px] font-semibold text-[#0078D4]">
                 {departmentFilter}
+              </span>
+            )}
+            {roleFilter !== 'All Roles' && (
+              <span className="rounded-full bg-blue-50 border border-blue-100 px-2 py-0.5 text-[10px] font-semibold text-[#0078D4]">
+                {roleFilter}
               </span>
             )}
             {performanceFilter !== PERFORMANCE_FILTERS[0] && (
@@ -563,215 +509,246 @@ export const EmployeesPage: React.FC = () => {
         )}
       </div>
 
-      {/* ── Employee Table ─────────────────────────────────────────────────── */}
-      <div className="card-surface overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="border-b border-slate-100" style={{ background: '#f8fafc' }}>
-                <th className="px-5 py-3 text-left">
-                  <SortableHeader field="name">Employee</SortableHeader>
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <SortableHeader field="role">Role</SortableHeader>
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <SortableHeader field="department">Department</SortableHeader>
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <SortableHeader field="performance">Performance</SortableHeader>
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <SortableHeader field="goalCompletion">Goal Completion</SortableHeader>
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <SortableHeader field="trend">Trend</SortableHeader>
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    AI Signal
-                  </span>
-                </th>
-                <th className="px-4 py-3 pr-5 text-right">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                    Action
-                  </span>
-                </th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-5 py-16 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
-                        <Users className="h-6 w-6" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-700">No employees found</p>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          Try adjusting your search or filters.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={clearFilters}
-                        className="mt-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
-                      >
-                        Clear all filters
-                      </button>
-                    </div>
-                  </td>
+      {/* ── Loading / Error / Table Container ───────────────────────────── */}
+      {loading ? (
+        <div className="card-surface p-16 text-center flex flex-col items-center justify-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-[#0078D4]">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-800">Loading Employees Directory…</p>
+            <p className="text-xs text-slate-400 mt-1">Connecting to http://127.0.0.1:8000/api/employees</p>
+          </div>
+        </div>
+      ) : error ? (
+        <div className="card-surface p-12 text-center flex flex-col items-center justify-center gap-3 border-red-200 bg-red-50/20">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-100 text-red-600">
+            <AlertCircle className="h-6 w-6" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-800">Unable to load employees</p>
+            <p className="text-xs font-mono text-red-600 mt-1 max-w-md">{error}</p>
+          </div>
+          <button
+            type="button"
+            onClick={fetchEmployees}
+            className="mt-2 inline-flex items-center gap-2 rounded-lg bg-[#0078D4] px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#0060b0] transition"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Retry Connection
+          </button>
+        </div>
+      ) : (
+        <div className="card-surface overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b border-slate-100" style={{ background: '#f8fafc' }}>
+                  <th className="px-5 py-3 text-left">
+                    <SortableHeader field="name">Employee</SortableHeader>
+                  </th>
+                  <th className="px-4 py-3 text-left">
+                    <SortableHeader field="role">Role</SortableHeader>
+                  </th>
+                  <th className="px-4 py-3 text-left">
+                    <SortableHeader field="department">Department</SortableHeader>
+                  </th>
+                  <th className="px-4 py-3 text-left">
+                    <SortableHeader field="performance">Performance</SortableHeader>
+                  </th>
+                  <th className="px-4 py-3 text-left">
+                    <SortableHeader field="goalCompletion">Goal Completion</SortableHeader>
+                  </th>
+                  <th className="px-4 py-3 text-left">
+                    <SortableHeader field="trend">Trend</SortableHeader>
+                  </th>
+                  <th className="px-4 py-3 text-left">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      AI Signal
+                    </span>
+                  </th>
+                  <th className="px-4 py-3 pr-5 text-right">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                      Action
+                    </span>
+                  </th>
                 </tr>
-              ) : (
-                filtered.map((emp, idx) => (
-                  <tr
-                    key={emp.id}
-                    className="group border-b border-slate-50 transition-colors hover:bg-slate-50/80"
-                    style={{
-                      animationDelay: `${idx * 40}ms`,
-                    }}
-                  >
-                    {/* Employee */}
-                    <td className="px-5 py-3.5">
-                      <div className="flex items-center gap-3">
-                        {/* Avatar */}
-                        <div
-                          className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-sm"
-                          style={{ background: emp.avatarColor }}
-                        >
-                          {emp.initials}
-                          {/* Online/status dot — color by trend */}
-                          <span
-                            className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-white"
-                            style={{
-                              background:
-                                emp.trend === 'improving'
-                                  ? '#16a34a'
-                                  : emp.trend === 'stable'
-                                  ? '#94a3b8'
-                                  : emp.trend === 'slight-decline'
-                                  ? '#d97706'
-                                  : '#dc2626',
-                            }}
-                          />
+              </thead>
+
+              <tbody>
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-5 py-16 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
+                          <Users className="h-6 w-6" />
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-slate-900 leading-tight">
-                            {emp.name}
+                          <p className="text-sm font-semibold text-slate-700">No employees found</p>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            Try adjusting your search or filters.
                           </p>
-                          <p className="text-[11px] text-slate-400 font-mono mt-0.5">{emp.id}</p>
                         </div>
+                        <button
+                          type="button"
+                          onClick={clearFilters}
+                          className="mt-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition"
+                        >
+                          Clear all filters
+                        </button>
                       </div>
                     </td>
-
-                    {/* Role */}
-                    <td className="px-4 py-3.5">
-                      <p className="text-xs font-medium text-slate-700 leading-tight max-w-[160px]">
-                        {emp.role}
-                      </p>
-                    </td>
-
-                    {/* Department */}
-                    <td className="px-4 py-3.5">
-                      <span className="inline-flex items-center rounded-md border border-slate-200/80 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                        {emp.department}
-                      </span>
-                    </td>
-
-                    {/* Performance */}
-                    <td className="px-4 py-3.5">
-                      <PerformanceCell value={emp.performance} />
-                    </td>
-
-                    {/* Goal Completion */}
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className="text-xs font-bold tabular-nums"
-                          style={{
-                            color:
-                              emp.goalCompletion >= 85
-                                ? '#16a34a'
-                                : emp.goalCompletion >= 70
-                                ? '#d97706'
-                                : '#dc2626',
-                          }}
-                        >
-                          {emp.goalCompletion}%
-                        </span>
-                        <div
-                          className="h-1.5 w-12 rounded-full overflow-hidden"
-                          style={{
-                            background:
-                              emp.goalCompletion >= 85
-                                ? '#dcfce7'
-                                : emp.goalCompletion >= 70
-                                ? '#fef3c7'
-                                : '#fee2e2',
-                          }}
-                        >
+                  </tr>
+                ) : (
+                  filtered.map((emp, idx) => (
+                    <tr
+                      key={emp.id}
+                      className="group border-b border-slate-50 transition-colors hover:bg-slate-50/80"
+                      style={{
+                        animationDelay: `${idx * 40}ms`,
+                      }}
+                    >
+                      {/* Employee */}
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-3">
+                          {/* Avatar */}
                           <div
-                            className="h-full rounded-full"
+                            className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white shadow-sm"
+                            style={{ background: emp.avatarColor }}
+                          >
+                            {emp.initials}
+                            {/* Online/status dot — color by trend */}
+                            <span
+                              className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full ring-2 ring-white"
+                              style={{
+                                background:
+                                  emp.trend === 'improving'
+                                    ? '#16a34a'
+                                    : emp.trend === 'stable'
+                                    ? '#94a3b8'
+                                    : emp.trend === 'slight-decline'
+                                    ? '#d97706'
+                                    : '#dc2626',
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900 leading-tight">
+                              {emp.name}
+                            </p>
+                            <p className="text-[11px] text-slate-400 font-mono mt-0.5">{emp.id}</p>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Role */}
+                      <td className="px-4 py-3.5">
+                        <p className="text-xs font-medium text-slate-700 leading-tight max-w-[160px]">
+                          {emp.role}
+                        </p>
+                      </td>
+
+                      {/* Department */}
+                      <td className="px-4 py-3.5">
+                        <span className="inline-flex items-center rounded-md border border-slate-200/80 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                          {emp.department}
+                        </span>
+                      </td>
+
+                      {/* Performance */}
+                      <td className="px-4 py-3.5">
+                        <PerformanceCell value={emp.performance} />
+                      </td>
+
+                      {/* Goal Completion */}
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className="text-xs font-bold tabular-nums"
                             style={{
-                              width: `${emp.goalCompletion}%`,
-                              background:
+                              color:
                                 emp.goalCompletion >= 85
                                   ? '#16a34a'
                                   : emp.goalCompletion >= 70
                                   ? '#d97706'
                                   : '#dc2626',
                             }}
-                          />
+                          >
+                            {emp.goalCompletion}%
+                          </span>
+                          <div
+                            className="h-1.5 w-12 rounded-full overflow-hidden"
+                            style={{
+                              background:
+                                emp.goalCompletion >= 85
+                                  ? '#dcfce7'
+                                  : emp.goalCompletion >= 70
+                                  ? '#fef3c7'
+                                  : '#fee2e2',
+                            }}
+                          >
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${emp.goalCompletion}%`,
+                                background:
+                                  emp.goalCompletion >= 85
+                                    ? '#16a34a'
+                                    : emp.goalCompletion >= 70
+                                    ? '#d97706'
+                                    : '#dc2626',
+                              }}
+                            />
+                          </div>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Trend */}
-                    <td className="px-4 py-3.5">
-                      <TrendBadge trend={emp.trend} />
-                    </td>
+                      {/* Trend */}
+                      <td className="px-4 py-3.5">
+                        <TrendBadge trend={emp.trend} />
+                      </td>
 
-                    {/* AI Signal */}
-                    <td className="px-4 py-3.5">
-                      <AiSignalBadge signal={emp.aiSignal} severity={emp.aiSignalSeverity} />
-                    </td>
+                      {/* AI Signal */}
+                      <td className="px-4 py-3.5">
+                        <AiSignalBadge signal={emp.aiSignal} severity={emp.aiSignalSeverity} />
+                      </td>
 
-                    {/* Action */}
-                    <td className="px-4 py-3.5 pr-5 text-right">
-                      <Link
-                        to={`/employees/${emp.id}`}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:border-[#0078D4]/40 hover:bg-blue-50/40 hover:text-[#0078D4] group-hover:shadow-md"
-                      >
-                        View
-                        <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-                      </Link>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Table footer */}
-        {filtered.length > 0 && (
-          <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3 bg-slate-50/50">
-            <p className="text-[11px] text-slate-400">
-              Showing <span className="font-semibold text-slate-600">{filtered.length}</span> of{' '}
-              <span className="font-semibold text-slate-600">{total}</span> employees
-            </p>
-            <p className="text-[11px] text-slate-400">
-              Sorted by{' '}
-              <span className="font-semibold text-slate-600">
-                {sortField ?? 'default'}
-              </span>{' '}
-              · {sortAsc ? '↑ Ascending' : '↓ Descending'}
-            </p>
+                      {/* Action */}
+                      <td className="px-4 py-3.5 pr-5 text-right">
+                        <Link
+                          to={`/employees/${emp.id}`}
+                          state={{ employee: emp }}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:border-[#0078D4]/40 hover:bg-blue-50/40 hover:text-[#0078D4] group-hover:shadow-md"
+                        >
+                          View
+                          <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-        )}
-      </div>
+
+          {/* Table footer */}
+          {filtered.length > 0 && (
+            <div className="flex items-center justify-between border-t border-slate-100 px-5 py-3 bg-slate-50/50">
+              <p className="text-[11px] text-slate-400">
+                Showing <span className="font-semibold text-slate-600">{filtered.length}</span> of{' '}
+                <span className="font-semibold text-slate-600">{total}</span> employees
+              </p>
+              <p className="text-[11px] text-slate-400">
+                Sorted by{' '}
+                <span className="font-semibold text-slate-600">
+                  {sortField ?? 'default'}
+                </span>{' '}
+                · {sortAsc ? '↑ Ascending' : '↓ Descending'}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Bottom Breathing Room ──────────────────────────────────────────── */}
       <div className="h-4" />

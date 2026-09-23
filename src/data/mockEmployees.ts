@@ -247,14 +247,67 @@ export const MOCK_EMPLOYEES: Employee[] = [
   },
 ];
 
+const DB_EMPLOYEE_NAMES: Record<string, string> = {
+  EMP001: 'Anudeep',
+  EMP002: 'Tony Stark',
+  EMP003: 'Hermione Granger',
+  EMP004: 'Peter Parker',
+  EMP005: 'Bruce Wayne',
+  EMP006: 'Wanda Maximoff',
+  EMP007: 'Diana Prince',
+  EMP008: 'Steve Rogers',
+  EMP009: 'Natasha Romanoff',
+  EMP010: 'Sherlock Holmes',
+  EMP011: 'Eleven',
+  EMP012: 'Thomas Anderson',
+  EMP013: 'Katniss Everdeen',
+  EMP014: 'Jack Sparrow',
+  EMP015: 'Mia Wallace',
+  EMP016: 'Harry Potter',
+  EMP017: 'Wednesday Addams',
+  EMP018: 'Peter Venkman',
+  EMP019: 'Lara Croft',
+  EMP020: 'Neo',
+  EMP021: 'Tony Montana',
+  EMP022: 'Amélie Poulain',
+  EMP023: 'Walter White',
+  EMP024: 'Daenerys Targaryen',
+  EMP025: 'Indiana Jones',
+};
+
 export function getEmployeeById(id?: string): Employee {
   if (!id) return MOCK_EMPLOYEES[0];
+
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      const stored = sessionStorage.getItem('performia_employees');
+      if (stored) {
+        const list = JSON.parse(stored);
+        const match = list.find((e: any) => e.id === id || e.id?.toUpperCase() === id?.toUpperCase());
+        if (match) return match;
+      }
+    }
+  } catch (_) {}
+
+  const normalizedKey = id.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const dbName = DB_EMPLOYEE_NAMES[normalizedKey];
+
   const cleanedId = id.toUpperCase().replace(/^EMP/, 'EMP-');
+  const num = parseInt(id.replace(/\D/g, ''), 10);
+  const normalizedEmpId = !isNaN(num) ? `EMP-${1000 + (num % 1000)}` : '';
+
   const found = MOCK_EMPLOYEES.find(
     (e) =>
       e.id.toUpperCase() === id.toUpperCase() ||
       e.id.toUpperCase() === cleanedId ||
+      (normalizedEmpId && e.id.toUpperCase() === normalizedEmpId) ||
+      (dbName && e.name.toLowerCase() === dbName.toLowerCase()) ||
       e.name.toLowerCase() === id.toLowerCase()
   );
-  return found || MOCK_EMPLOYEES[0];
+
+  const base = found || MOCK_EMPLOYEES[0];
+  if (dbName && base.name !== dbName) {
+    return { ...base, id, name: dbName };
+  }
+  return base;
 }
